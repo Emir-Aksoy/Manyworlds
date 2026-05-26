@@ -1,0 +1,77 @@
+# ───────────────────────────────────────────────────────────────
+# Next.js / Node
+# ───────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+*.log
+.DS_Store
+.env
+.env.local
+.env.*.local
+
+# TypeScript build info
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# ───────────────────────────────────────────────────────────────
+# 个人 / 本地配置(每个开发者不一样)
+# ───────────────────────────────────────────────────────────────
+.claude/launch.json
+
+# ───────────────────────────────────────────────────────────────
+# IP 二创剧本数据 — 不进开源 git。这些剧本基于 *他人作品* 的设定
+# 改编(角色名 / 世界观 / 商标),为避免版权风险,数据本身不公开。
+# 框架代码仍开源,任何人能照 DOCS/scenario-schema 写自己的剧本
+# 并把 JSON 放进 public/dlc/ 来跑。
+# ───────────────────────────────────────────────────────────────
+
+# ⚠️ 重要:git .gitignore 不支持行尾内嵌注释 — `#` 必须在行首。
+#    所有解释性注释都在规则行的*上面一行*单独写。
+
+# ─── 黄易《大唐双龙传》二创(寇仲/徐子陵/慈航静斋/魔门等)─────
+# 编译后产物
+public/dlc/datang.json
+# 角色立绘(10 个 NPC 子目录)
+public/portraits/datang/
+# 源数据(34 NPC + factions + locations + items + martial-arts + world.md)
+scenarios-src/datang/
+# Build + tag + portrait 处理脚本(全含硬编码 IP)
+scripts/build-datang-dlc.mjs
+scripts/attach-datang-portraits.mjs
+scripts/tag-datang-npcs.mjs
+# Prompt snapshots(快照里含真实 NPC 设定文案)
+__snapshots__/prompts/datang.*
+
+# ─── Games Workshop《Warhammer 40,000》二创 ─────────────
+# (阿斯塔特/混沌/审判庭/Astartes/Imperium 全是 GW 注册商标,法务最敏感)
+# 编译后产物
+public/dlc/warhammer40k.json
+# 角色立绘(如未来生成)
+public/portraits/warhammer40k/
+# Prompt snapshots
+__snapshots__/prompts/warhammer40k.*
+
+# ─── 跨 IP 一次性 migration / 辅助脚本(框架运行不依赖)──
+# 这些脚本内部硬编码引用了 datang / warhammer40k 的 NPC ids / beat ids,
+# 跑过一次完成数据迁移后就不再需要。开源 framework 用户不需要它们。
+scripts/tag-other-dlc-npcs.mjs
+scripts/backfill-world-control.mjs
+scripts/enable-dynamic-locations.mjs
+scripts/refactor-yuanmo-40k-to-locations.mjs
+scripts/upgrade-yuanmo-40k.mjs
+
+# ─── 立绘资产(如未来用户用过 _private 目录存敏感图)──
+public/portraits/_private/
+
+# ───────────────────────────────────────────────────────────────
+# 用户本机 dev 数据 / 备份
+# ───────────────────────────────────────────────────────────────
+*.bak
+*.local-backup.*

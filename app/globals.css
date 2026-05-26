@@ -1,0 +1,139 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
+  background: #0f0f15;
+  color: #e8e8ec;
+  min-height: 100vh;
+}
+
+a {
+  color: #8ab4ff;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+  background: #2a2d3e;
+  color: #e8e8ec;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background: #353a4f;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #4a6cf7;
+  border-color: #4a6cf7;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #5b7df7;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  background: #1a1d29;
+  color: #e8e8ec;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.wrap {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  background: #181b27;
+  border: 1px solid #2a2d3e;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.muted {
+  color: #888;
+  font-size: 13px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #2a2d3e;
+  color: #aaa;
+  margin-right: 4px;
+}
+
+.msg {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  max-width: 80%;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.msg.user {
+  background: #2c3a5e;
+  margin-left: auto;
+}
+
+.msg.assistant {
+  background: #1f2335;
+}
+
+.msg.system {
+  background: transparent;
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  font-size: 12px;
+  max-width: 100%;
+}
+
+.portrait {
+  width: 120px;
+  height: 160px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2a2d3e 0%, #1a1d29 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #666;
+  text-align: center;
+  padding: 8px;
+}

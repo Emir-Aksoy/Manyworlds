@@ -1,0 +1,31 @@
+{
+  "name": "world-crossing-poc",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Minimum runnable PoC for World Crossing. Halia chat + memory consolidation demo.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "bridge:claude": "node scripts/claude_bridge.mjs",
+    "bridge:codex": "node scripts/codex_bridge.mjs",
+    "dev:all": "node scripts/dev-all.mjs",
+    "build:datang": "node scripts/build-datang-dlc.mjs",
+    "test:prompt-snapshot": "tsx scripts/prompt-snapshot.mts",
+    "predev": "node -e \"const fs=require('fs');if(fs.existsSync('scripts/build-datang-dlc.mjs')){require('child_process').execSync('node scripts/build-datang-dlc.mjs',{stdio:'inherit'})}\"",
+    "prebuild": "node -e \"const fs=require('fs');if(fs.existsSync('scripts/build-datang-dlc.mjs')){require('child_process').execSync('node scripts/build-datang-dlc.mjs',{stdio:'inherit'})}\" && node scripts/prebuild-exclude-dev-routes.mjs"
+  },
+  "dependencies": {
+    "next": "^14.2.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "tsx": "^4.22.3",
+    "typescript": "^5.5.0"
+  }
+}

@@ -2,12 +2,14 @@
  * Prompt Snapshot
  * ================
  *
- * 用途:验证 prompt 段化重构后,4 个剧本 × 3 个 NPC × 2 种 ctx 变体的 system prompt
+ * 用途:验证 prompt 段化重构后,公开剧本 fixture 的 system prompt
  * 跟 baseline 完全一致(byte-identical)。
  *
  * 跑法:
- *   npm run test:prompt-snapshot         # 跑一遍,写入 / 更新 baseline
- *   npm run test:prompt-snapshot -- --check  # check 模式:对比 baseline,有 diff 就 exit 1
+ *   npm run test:prompt-snapshot                  # 跑公开 fixtures,写入 / 更新 baseline
+ *   npm run test:prompt-snapshot -- --check       # check 模式:对比公开 baseline
+ *   npm run test:prompt-snapshot -- --include-private --check
+ *                                                # 本机存在 ignored 私有 DLC 时才跑私有 fixtures
  *
  * 第一次跑产出 baseline 写到 __snapshots__/prompts/;以后修改了 prompt 段化相关代码,
  * 重跑能立刻看出哪些 prompt 发生了变化(新增段 / 段顺序变 / 段内容变)。
@@ -15,7 +17,7 @@
  * 不依赖 dev server,纯 CLI(tsx 跑 TS,直接 import lib/*)。
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,23 +53,48 @@ function buildPromptForSnapshot(
   return assembleSystemPrompt({ char, scenario, ctx, adaptation });
 }
 
-// ─── 1) 加载所有 DLC ───────────────────────────────────────────────
+const args = new Set(process.argv.slice(2));
+const checkMode = args.has('--check');
+const includePrivate = args.has('--include-private') || process.env.WC_PROMPT_SNAPSHOT_PRIVATE === '1';
+
+// ─── 1) 加载公开 manifest DLC ──────────────────────────────────────
 
 const manifestPath = join(repoRoot, 'public/dlc/manifest.json');
 const dlcManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
   scenarios: Array<{ id: string; url: string }>;
 };
 
-for (const entry of dlcManifest.scenarios) {
-  const filePath = join(repoRoot, 'public', entry.url);
+const loadedScenarioIds = new Set<string>();
+
+function loadScenarioFile(id: string, filePath: string) {
   const raw = JSON.parse(readFileSync(filePath, 'utf8'));
   const v = validateScenario(raw);
   if (!v.ok) {
-    console.error(`[snapshot] ${entry.id} schema 错误:`, v.errors);
+    console.error(`[snapshot] ${id} schema 错误:`, v.errors);
     process.exit(1);
   }
   _registerDlcScenario(v.scenario);
+  loadedScenarioIds.add(v.scenario.id);
   console.log(`[snapshot] 注册 ${v.scenario.id} (${v.scenario.npcs.length} NPC)`);
+}
+
+for (const entry of dlcManifest.scenarios) {
+  const filePath = join(repoRoot, 'public', entry.url);
+  loadScenarioFile(entry.id, filePath);
+}
+
+function loadPrivateScenarioIfNeeded(id: string) {
+  if (loadedScenarioIds.has(id)) return;
+  const filePath = join(repoRoot, 'public', 'dlc', `${id}.json`);
+  if (!existsSync(filePath)) {
+    console.error(`[snapshot] --include-private 需要本机存在 ${filePath}`);
+    process.exit(1);
+  }
+  loadScenarioFile(id, filePath);
+}
+
+if (includePrivate) {
+  for (const id of ['warhammer40k', 'datang']) loadPrivateScenarioIfNeeded(id);
 }
 _markDlcReady();
 
@@ -80,7 +107,7 @@ interface Fixture {
   variant: 'minimal' | 'rich';
 }
 
-const SCENARIO_FIXTURES: Array<{ id: string; npcs: string[] }> = [
+const PUBLIC_SCENARIO_FIXTURES: Array<{ id: string; npcs: string[] }> = [
   {
     id: 'starmail',
     npcs: ['starmail-npc-halia', 'starmail-npc-bao', 'starmail-npc-lighthouse'],
@@ -89,6 +116,9 @@ const SCENARIO_FIXTURES: Array<{ id: string; npcs: string[] }> = [
     id: 'yuanmo',
     npcs: ['yuanmo-npc-zhu-yuanzhang', 'yuanmo-npc-xu-da', 'yuanmo-npc-chang-yuchun'],
   },
+];
+
+const PRIVATE_SCENARIO_FIXTURES: Array<{ id: string; npcs: string[] }> = [
   {
     id: 'warhammer40k',
     npcs: [
@@ -102,6 +132,10 @@ const SCENARIO_FIXTURES: Array<{ id: string; npcs: string[] }> = [
     npcs: ['datang-npc-kou-zhong', 'datang-npc-xu-ziling', 'datang-npc-shi-feixuan'],
   },
 ];
+
+const SCENARIO_FIXTURES = includePrivate
+  ? [...PUBLIC_SCENARIO_FIXTURES, ...PRIVATE_SCENARIO_FIXTURES]
+  : PUBLIC_SCENARIO_FIXTURES;
 
 const FIXTURES: Fixture[] = [];
 for (const s of SCENARIO_FIXTURES) {
@@ -191,7 +225,6 @@ interface Result {
   newLen?: number;
 }
 
-const checkMode = process.argv.includes('--check');
 const results: Result[] = [];
 
 for (const fx of FIXTURES) {
@@ -238,7 +271,9 @@ for (const fx of FIXTURES) {
 const counts = { new: 0, unchanged: 0, changed: 0 };
 for (const r of results) counts[r.status]++;
 
-console.log(`[snapshot] ${results.length} fixtures (${SCENARIO_FIXTURES.length} scenarios × 3 NPCs × 2 variants)`);
+console.log(
+  `[snapshot] ${results.length} fixtures (${SCENARIO_FIXTURES.length} scenarios × 3 NPCs × 2 variants, private=${includePrivate ? 'on' : 'off'})`,
+);
 console.log(
   `  ${counts.new} new${checkMode ? ' (would write)' : ''}, ` +
     `${counts.unchanged} unchanged, ` +
@@ -262,8 +297,8 @@ if (counts.new > 0) {
   }
 }
 
-if (checkMode && counts.changed > 0) {
-  console.error('\n[snapshot] --check 模式下检测到变更,退出 1。');
+if (checkMode && (counts.changed > 0 || counts.new > 0)) {
+  console.error('\n[snapshot] --check 模式下检测到新增或变更,退出 1。');
   process.exit(1);
 }
 

@@ -28,7 +28,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveCustomBaseUrl } from '../../../lib/api-base-resolver';
+import {
+  assertPublicResolvableUrl,
+  resolveCustomBaseUrlSafely,
+} from '../../../lib/api-base-resolver';
 
 type ImageBody = {
   prompt: string;
@@ -44,6 +47,27 @@ type UpstreamImageData = {
   error?: { message?: string; code?: string; type?: string };
   data?: Array<{ b64_json?: string; url?: string; revised_prompt?: string }>;
 };
+
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const SAFE_IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+
+async function fetchSafeImageUrl(rawUrl: string): Promise<Response> {
+  let current = await assertPublicResolvableUrl(rawUrl, 'image lane 返回 URL');
+  for (let i = 0; i < 4; i++) {
+    const resp = await fetch(current, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (resp.status >= 300 && resp.status < 400) {
+      const location = resp.headers.get('location');
+      if (!location) return resp;
+      current = await assertPublicResolvableUrl(new URL(location, current).toString(), 'image lane 跳转 URL');
+      continue;
+    }
+    return resp;
+  }
+  throw new Error('image lane 返回 URL 跳转次数过多');
+}
 
 export async function POST(req: NextRequest) {
   const startedAt = Date.now();
@@ -71,7 +95,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    baseUrl = resolveCustomBaseUrl(req, url);
+    baseUrl = await resolveCustomBaseUrlSafely(req, url);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },
@@ -181,7 +205,7 @@ export async function POST(req: NextRequest) {
     // 服务只给了 url — server 反向 fetch 转 base64
     let imgResp: Response;
     try {
-      imgResp = await fetch(first.url, { signal: AbortSignal.timeout(30_000) });
+      imgResp = await fetchSafeImageUrl(first.url);
     } catch (err) {
       return NextResponse.json(
         {
@@ -198,8 +222,27 @@ export async function POST(req: NextRequest) {
         { status: 502 },
       );
     }
+    const mime = (imgResp.headers.get('content-type') || 'image/png').split(';')[0].trim().toLowerCase();
+    if (!SAFE_IMAGE_MIME.has(mime)) {
+      return NextResponse.json(
+        { error: `反向获取生图结果返回了非安全图片类型: ${mime}`, url: first.url },
+        { status: 502 },
+      );
+    }
+    const contentLength = Number(imgResp.headers.get('content-length') || '0');
+    if (contentLength > MAX_IMAGE_BYTES) {
+      return NextResponse.json(
+        { error: `反向获取生图结果过大(${contentLength} bytes)`, url: first.url },
+        { status: 502 },
+      );
+    }
     const buf = Buffer.from(await imgResp.arrayBuffer());
-    const mime = imgResp.headers.get('content-type') || 'image/png';
+    if (buf.byteLength > MAX_IMAGE_BYTES) {
+      return NextResponse.json(
+        { error: `反向获取生图结果过大(${buf.byteLength} bytes)`, url: first.url },
+        { status: 502 },
+      );
+    }
     dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
   } else {
     return NextResponse.json(

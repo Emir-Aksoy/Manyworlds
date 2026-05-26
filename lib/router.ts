@@ -18,7 +18,12 @@ import {
   RoutingMatrix,
   TaskTag,
 } from './models';
-import { isPublicMode, PUBLIC_FALLBACK_CHAIN } from './runtime-mode';
+import {
+  getDefaultPublicMatrix,
+  isLaneAvailableInCurrentMode,
+  isPublicMode,
+  PUBLIC_FALLBACK_CHAIN,
+} from './runtime-mode';
 import { createWriteState } from './store-write-helper';
 
 const ROUTER_KEY = 'wc_poc_router_v2'; // v2: 加 taskFallback 字段
@@ -64,6 +69,25 @@ const DEFAULT_STATE: RouterState = {
   taskFallback: {},
 };
 
+function sanitizeMatrixForCurrentMode(matrix: RoutingMatrix, fallback: RoutingMatrix): RoutingMatrix {
+  const next = { ...matrix };
+  for (const task of ALL_TASK_TAGS) {
+    if (!isLaneAvailableInCurrentMode(next[task])) {
+      next[task] = fallback[task];
+    }
+  }
+  return next;
+}
+
+function sanitizeFallbackChainForCurrentMode(chain: LaneId[]): LaneId[] {
+  const out: LaneId[] = [];
+  for (const lane of chain) {
+    if (!isLaneAvailableInCurrentMode(lane)) continue;
+    if (!out.includes(lane)) out.push(lane);
+  }
+  return out;
+}
+
 // ─── 持久化 ──────────────────────────────────────────────────────────
 
 function readState(): RouterState {
@@ -103,8 +127,12 @@ export const router = {
   /** 获取当前生效矩阵（preset matrix + overrides）。 */
   getActiveMatrix(): RoutingMatrix {
     const s = readState();
+    if (isPublicMode()) {
+      const base = getDefaultPublicMatrix();
+      return sanitizeMatrixForCurrentMode({ ...base, ...s.overrides }, base);
+    }
     const preset = PRESETS.find((p) => p.id === s.presetId) ?? PRESETS[0];
-    return { ...preset.matrix, ...s.overrides };
+    return sanitizeMatrixForCurrentMode({ ...preset.matrix, ...s.overrides }, preset.matrix);
   },
   /** 单任务路由：用户 override > preset。 */
   resolveLane(task: TaskTag): LaneId {
@@ -134,7 +162,10 @@ export const router = {
   getTaskFallback(task: TaskTag): LaneId[] {
     const s = readState();
     const custom = s.taskFallback?.[task];
-    if (Array.isArray(custom)) return [...custom];
+    if (Array.isArray(custom)) {
+      const sanitized = sanitizeFallbackChainForCurrentMode(custom);
+      return sanitized.length > 0 ? sanitized : getDefaultTaskFallback();
+    }
     return getDefaultTaskFallback();
   },
 

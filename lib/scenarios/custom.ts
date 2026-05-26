@@ -471,7 +471,8 @@ export function validateScenario(raw: unknown): ValidateResult {
         );
     }
     for (const art of loc.artifacts ?? []) {
-      if (art.requiresCompletedBeats) {
+      // 动态剧本没有声明式 beat 列表,requiresCompletedBeats 可指向运行时 milestone id。
+      if (art.requiresCompletedBeats && allBeatIds.size > 0) {
         const bad = art.requiresCompletedBeats.filter((b) => !allBeatIds.has(b));
         if (bad.length > 0)
           console.warn(

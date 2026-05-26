@@ -93,6 +93,7 @@ import { exportAllAsJson } from '../lib/full-export';
 import {
   applyWcEventsToPlaza,
   applyWcStatEventsToPlaza,
+  parseWcEvents,
   parseWcTrustEvents,
   detectChatMode,
   recordExternalFailure,
@@ -137,8 +138,9 @@ type Tab = 'plaza' | 'chat' | 'settings' | 'portrait' | 'memory' | 'models';
  *
  * 流程:
  *   1. applyWcStatEventsToPlaza 解析 stat 变化(静默写入,只 console.log debug)
- *   2. applyWcEventsToPlaza 解析死亡 / 物品损毁(写入 + 返回净化文本 + 名字)
- *   3. 命中 死亡 / 物品损毁 时弹 alert(用 setTimeout 让 UI 先刷)
+ *   2. companion-died / item-lost 先人工确认,确认后才允许写入
+ *   3. applyWcEventsToPlaza 解析世界事件(写入 + 返回净化文本 + 名字)
+ *   4. 命中 死亡 / 物品损毁 时弹 alert(用 setTimeout 让 UI 先刷)
  *
  * @param rawText LLM 原始输出(可能含 WC-EVENT/STAT 注释)
  * @param source 调用源,只用于 console.log 上下文
@@ -149,6 +151,25 @@ function processWcMarkers(
   source: 'npc-chat' | 'director-action' | 'director-advance' | 'banter',
 ): string {
   const statChanges = applyWcStatEventsToPlaza(rawText);
+  const destructiveEvents = parseWcEvents(rawText).filter(
+    (ev) => ev.kind === 'companion-died' || ev.kind === 'item-lost',
+  );
+  let allowDestructiveEvents = false;
+  if (destructiveEvents.length > 0 && typeof window !== 'undefined') {
+    allowDestructiveEvents = window.confirm(
+      [
+        'LLM 输出了不可逆世界事件,需要你确认后才会写入存档。',
+        '',
+        ...destructiveEvents.map((ev) =>
+          ev.kind === 'companion-died'
+            ? `队友阵亡: ${ev.id}${ev.reason ? ` (${ev.reason})` : ''}`
+            : `物品永失: ${ev.id}${ev.reason ? ` (${ev.reason})` : ''}`,
+        ),
+        '',
+        '确认写入这些不可逆变化?',
+      ].join('\n'),
+    );
+  }
   const {
     cleanedText,
     diedCompanionNames,
@@ -158,7 +179,7 @@ function processWcMarkers(
     newlyDiscoveredArtifactIds,
     sceneStateChanges,
     newlySpawnedLocations,
-  } = applyWcEventsToPlaza(rawText);
+  } = applyWcEventsToPlaza(rawText, { allowDestructiveEvents });
 
   if (statChanges.length > 0) {
     console.log(`[WC-STAT][${source}]`, statChanges);
@@ -343,29 +364,61 @@ function resolveDirectorExtraCtx(scenarioId: string): DirectorPlayerCtx {
 
 const EVENTS_KEY = 'wc_poc_events';
 
-/** 容错读 sessionStorage 里的事件列表，外部污染 / 半写入也兜底成 []。 */
+function readStorageCandidates(key: string): { raw: string; source: 'local' | 'session' }[] {
+  if (typeof window === 'undefined') return [];
+  const candidates: { raw: string; source: 'local' | 'session' }[] = [];
+  try {
+    const local = window.localStorage.getItem(key);
+    if (local != null) candidates.push({ raw: local, source: 'local' });
+  } catch {
+    /* localStorage disabled */
+  }
+  try {
+    const session = window.sessionStorage.getItem(key);
+    if (session != null) candidates.push({ raw: session, source: 'session' });
+  } catch {
+    /* sessionStorage disabled */
+  }
+  return candidates;
+}
+
+function writeDurableStorage(key: string, value: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, value);
+    return;
+  } catch {
+    /* quota / disabled; fall back to current-tab storage */
+  }
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    /* quota / disabled */
+  }
+}
+
+/** 容错读 localStorage 里的事件列表；旧 sessionStorage 数据会自动迁移。 */
 function readEvents(): string[] {
   if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.sessionStorage.getItem(EVENTS_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
+  for (const { raw, source } of readStorageCandidates(EVENTS_KEY)) {
+    try {
+      const arr = JSON.parse(raw);
+      const events = Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [];
+      if (source === 'session') writeDurableStorage(EVENTS_KEY, JSON.stringify(events));
+      return events;
+    } catch {
+      continue;
+    }
   }
+  return [];
 }
 
 function writeEvents(events: string[]) {
   if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(EVENTS_KEY, JSON.stringify(events));
-  } catch {
-    /* quota / disabled / 都吞掉 */
-  }
+  writeDurableStorage(EVENTS_KEY, JSON.stringify(events));
 }
 
-// ── 会话 / 立绘持久化（切 tab/刷新不丢） ──────────────────────────────
+// ── 会话 / 立绘持久化 ────────────────────────────────────────────────
 // v2: messages 按 NPC 隔离存储 { [characterId]: Message[] },让用户跟不同 NPC 各聊各的
 const MSG_KEY_V2 = 'wc_poc_messages_v2';
 /**
@@ -398,44 +451,45 @@ type MsgStore = Record<string, Record<string, Message[]>>; // [scenarioId][npcId
 
 function readMsgStore(): MsgStore {
   if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.sessionStorage.getItem(MSG_KEY_V2);
-    if (!raw) return {};
-    const obj = JSON.parse(raw);
-    if (!obj || typeof obj !== 'object') return {};
-    // 旧格式检测:第一层 value 是数组 → 旧扁平结构,迁移到 'starmail' namespace
-    const entries = Object.entries(obj as Record<string, unknown>);
-    if (entries.length > 0 && Array.isArray(entries[0][1])) {
-      const migrated: MsgStore = { [DEFAULT_SCENARIO_ID]: {} };
-      for (const [npcId, arr] of entries) {
-        if (Array.isArray(arr)) {
-          migrated[DEFAULT_SCENARIO_ID][npcId] = arr.filter(isValidMessage);
+  for (const { raw, source } of readStorageCandidates(MSG_KEY_V2)) {
+    try {
+      const obj = JSON.parse(raw);
+      if (!obj || typeof obj !== 'object') continue;
+
+      // 旧格式检测:第一层 value 是数组 → 旧扁平结构,迁移到 'starmail' namespace
+      const entries = Object.entries(obj as Record<string, unknown>);
+      if (entries.length > 0 && Array.isArray(entries[0][1])) {
+        const migrated: MsgStore = { [DEFAULT_SCENARIO_ID]: {} };
+        for (const [npcId, arr] of entries) {
+          if (Array.isArray(arr)) {
+            migrated[DEFAULT_SCENARIO_ID][npcId] = arr.filter(isValidMessage);
+          }
+        }
+        writeDurableStorage(MSG_KEY_V2, JSON.stringify(migrated));
+        return migrated;
+      }
+
+      // 新格式
+      const out: MsgStore = {};
+      for (const [sid, npcMap] of entries) {
+        if (!npcMap || typeof npcMap !== 'object') continue;
+        out[sid] = {};
+        for (const [npcId, arr] of Object.entries(npcMap as Record<string, unknown>)) {
+          if (Array.isArray(arr)) out[sid][npcId] = arr.filter(isValidMessage);
         }
       }
-      return migrated;
+      if (source === 'session') writeDurableStorage(MSG_KEY_V2, JSON.stringify(out));
+      return out;
+    } catch {
+      continue;
     }
-    // 新格式
-    const out: MsgStore = {};
-    for (const [sid, npcMap] of entries) {
-      if (!npcMap || typeof npcMap !== 'object') continue;
-      out[sid] = {};
-      for (const [npcId, arr] of Object.entries(npcMap as Record<string, unknown>)) {
-        if (Array.isArray(arr)) out[sid][npcId] = arr.filter(isValidMessage);
-      }
-    }
-    return out;
-  } catch {
-    return {};
   }
+  return {};
 }
 
 function writeMsgStore(store: MsgStore) {
   if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(MSG_KEY_V2, JSON.stringify(store));
-  } catch {
-    /* quota */
-  }
+  writeDurableStorage(MSG_KEY_V2, JSON.stringify(store));
 }
 
 function readMessagesFor(scenarioId: string, npcId: string): Message[] {
@@ -459,7 +513,7 @@ function listChattedNpcIds(scenarioId: string): string[] {
 
 /**
  * B1:返广场时跑多 NPC 记忆固化。
- * 遍历本 session 跟玩家有过对话的所有 NPC,挨个调 consolidateNpcMemory,
+ * 遍历当前剧本中跟玩家有过对话的所有 NPC,挨个调 consolidateNpcMemory,
  * 返回汇总信息让 UI 弹给用户。
  *
  * 内部容错:某个 NPC 固化失败不影响其他;无对话 NPC 跳过。
@@ -1861,7 +1915,7 @@ function ChatTab({
       setLastLaneUsed(resp.laneUsed ?? null);
       setLastFallback(resp.fallbackPath ?? null);
       setLastDuration(resp.durationSec ?? null);
-      // 把 episodic event 临时存进 sessionStorage,记忆 tab 会读
+      // 把 episodic event 存进 localStorage,记忆 tab 会读
       const events = readEvents();
       events.push(`玩家: ${userMsg.content}`);
       events.push(`${currentNpc.identity.name}: ${cleanedText}`);
@@ -1937,7 +1991,7 @@ function ChatTab({
       plaza.setNpcSummary(args.npcIdAtCall, scenarioId, result.summaryText);
       // F2:切 NPC 后才完成?用 ref 读实时值,不是 closure 旧值
       if (args.npcIdAtCall !== currentNpcIdRef.current) {
-        // 仍然落地到 sessionStorage(对的 NPC 那边),但不刷新 UI
+        // 仍然落地到消息历史(对的 NPC 那边),但不刷新 UI
         writeMessagesFor(scenarioId, args.npcIdAtCall, result.compressed);
         return;
       }
@@ -1988,7 +2042,7 @@ function ChatTab({
       lastBanterAtTurnRef.current = turnIndexRef.current;
       const banterContent = `${COMPANION_PREFIX}${c.profile.characterId.replace(/^companion-/, '')}] ${result.line}`;
       const updated: Message[] = [...args.baselineMessages, { role: 'assistant', content: banterContent }];
-      // F2:用户切走时,banter 落到原 NPC 的历史(sessionStorage),不刷新 UI
+      // F2:用户切走时,banter 落到原 NPC 的历史,不刷新 UI
       if (args.npcIdAtCall !== currentNpcIdRef.current) {
         writeMessagesFor(scenarioId, args.npcIdAtCall, updated);
       } else {
@@ -5277,9 +5331,9 @@ function StorageUsagePanel() {
         </button>
       </div>
       <div className="muted" style={{ fontSize: 11, marginTop: 6, lineHeight: 1.5 }}>
-        覆盖:广场进度 / 路由配置 / 自定义剧本 / 自定义 lane / Base URL / Onboarding 状态。
+        覆盖:广场进度 / 对话历史 / 路由配置 / 自定义剧本 / 自定义 lane / Base URL / Onboarding 状态。
         <br />
-        默认<b>不</b>含 API key 明文。导入功能待开发,目前需手动 paste 到 localStorage。
+        默认<b>不</b>含 API key 明文,Custom Lane 的 apiKey 会清空。导入功能待开发,目前需手动 paste 到 localStorage。
       </div>
     </div>
   );

@@ -200,9 +200,11 @@
 | `wc_poc_router_v2` | 路由预设 / 覆盖 / fallback 链 |
 | `wc_poc_pref_v1` | 用户偏好(默认 model 等) |
 | `wc_poc_byok_onboarded` | 引导是否已 dismiss |
-| `wc_poc_custom_lanes_v1` | 自定义 LLM Lane(含 apiKey 嵌入) |
-| `wc_poc_custom_image_lanes_v1` | 自定义 Image Lane(立绘生图,含 apiKey 嵌入) |
+| `wc_poc_custom_lanes_v1` | 自定义 LLM Lane(含 apiKey 嵌入,默认导出会清空) |
+| `wc_poc_custom_image_lanes_v1` | 自定义 Image Lane(立绘生图,含 apiKey 嵌入,默认导出会清空) |
 | `wc_poc_custom_scenarios_v1` | 自定义剧本 |
+| `wc_poc_messages_v2` | NPC 对话历史 |
+| `wc_poc_events` | 记忆 Tab 事件流 |
 | `wc_poc_apikey_*` | 你的独立 BYOK API Keys(**敏感**,默认不导出) |
 
 **sessionStorage**(**关 tab 立即清空**,**不**进导出包,**不**跨 tab / 跨设备):
@@ -217,8 +219,8 @@
 
 设置 Tab → **"存储用量"** 面板 → 点 **"⬇ 导出全部进度(JSON)"**
 
-- 默认**不包含 BYOK API Key**(安全。注意:Custom Lane / Image Lane 对象内嵌的 apiKey 字段会跟着 lane 数据一起导出 — 想完全脱敏导出,先在 ModelsTab 删掉那些 lane 再导)
-- 勾选"包含 Key"会弹确认对话框,确认后**独立**的 `wc_poc_apikey_*` 也会导出
+- 默认**不包含 BYOK API Key**:独立的 `wc_poc_apikey_*` 不导出,Custom Lane / Image Lane 对象里的 `apiKey` 会清空
+- 勾选"包含 Key"会弹确认对话框,确认后**独立**的 `wc_poc_apikey_*` 和 Custom Lane / Image Lane 内嵌 `apiKey` 都会导出
 - ⚠️ **不包含 sessionStorage 中的立绘缓存** — 跨设备迁移后立绘需要重新生
 
 ### 6.3 清空数据

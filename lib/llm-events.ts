@@ -21,8 +21,8 @@
  *   - 由 parseWcEvents 返回的事件**未经白名单校验**。调用方必须在
  *     plaza.markCompanionDead / markItemLost 这一层用 currentRunLoadout
  *     白名单过滤,避免 LLM 写错 id 或越权杀掉广场上没带进来的队友。
- *   - location-changed 不做白名单(动态剧本允许 LLM 即兴造新地点,setCurrentLocation
- *     不会校验是否在 scenario.locations 里。Scenario 设计上应该尽量列全主要地点)。
+ *   - location-changed 在有 locations 白名单的剧本里必须命中预设或已 spawn 地点;
+ *     即兴造新地点只能先走 location-spawned,通过双开关和配额后再切过去。
  *   - milestone-reached 通过 plaza.triggerBeats 去重,重复触发同一 id 不会双倍计入完成度。
  *   - parser 限定每条消息最多 16 个事件,防 LLM 失控刷屏。
  */
@@ -88,6 +88,13 @@ export interface WcTrustEvent {
   reason: string;
   start: number;
   end: number;
+}
+
+export interface ApplyWcEventsOptions {
+  /**
+   * companion-died / item-lost 属于不可逆事件。默认拒绝,UI 可在人工确认后显式打开。
+   */
+  allowDestructiveEvents?: boolean;
 }
 
 // HTML 注释格式: <!-- WC-EVENT <kind> <key>=<value> [reason="..."] -->
@@ -571,7 +578,7 @@ import { getScenario, type DynamicLocation } from './scenarios';
  * location-changed / milestone-reached 只在当前在剧本里(plaza.inScenario != null)时生效;
  * 广场态下静默忽略。
  */
-export function applyWcEventsToPlaza(text: string): {
+export function applyWcEventsToPlaza(text: string, opts: ApplyWcEventsOptions = {}): {
   cleanedText: string;
   diedCompanionNames: string[];
   lostItemNames: string[];
@@ -716,6 +723,14 @@ export function applyWcEventsToPlaza(text: string): {
   const milestoneIds: string[] = [];
   for (const ev of events) {
     if (ev.kind === 'companion-died') {
+      if (!opts.allowDestructiveEvents) {
+        recordExternalFailure(
+          'WC-EVENT',
+          `companion-died characterId=${ev.id}`,
+          '不可逆事件待人工确认,未自动 apply',
+        );
+        continue;
+      }
       if (plaza.markCompanionDead(ev.id)) {
         const c = plaza.get().companions.find((x) => x.characterId === ev.id);
         // 取一个对玩家有意义的展示名:origin 第一段 / id 去前缀 / fallback id
@@ -726,6 +741,14 @@ export function applyWcEventsToPlaza(text: string): {
         diedCompanionNames.push(display);
       }
     } else if (ev.kind === 'item-lost') {
+      if (!opts.allowDestructiveEvents) {
+        recordExternalFailure(
+          'WC-EVENT',
+          `item-lost itemId=${ev.id}`,
+          '不可逆事件待人工确认,未自动 apply',
+        );
+        continue;
+      }
       if (plaza.markItemLost(ev.id)) {
         const i = plaza.get().inventory.find((x) => x.id === ev.id);
         lostItemNames.push(i?.name ?? ev.id);
@@ -733,13 +756,14 @@ export function applyWcEventsToPlaza(text: string): {
     } else if (ev.kind === 'location-changed') {
       // 只在剧本内生效;广场态静默忽略
       if (!currentScenarioId) continue;
-      // A4:白名单 warning(放宽到"预设+动态"集)— 不在内时记一条 fail 但仍 apply
+      // A4:白名单 guard(放宽到"预设+动态"集)— 不在内时拒绝 apply
       if (scenarioLocations && !validLocationIds.has(ev.id)) {
         recordExternalFailure(
           'WC-EVENT',
           `location-changed value=${ev.id}`,
-          `value '${ev.id}' 既不在预设白名单也不在动态扩展中(已 apply,可能 LLM 编造地点)`,
+          `value '${ev.id}' 既不在预设白名单也不在动态扩展中(已拒绝,可能 LLM 编造地点)`,
         );
+        continue;
       }
       // T7:连通图软校验 — 当前 location 有 connections 表且目标不在内 → warn 但仍 apply
       // 当前 location 优先查动态(spawned),再查预设

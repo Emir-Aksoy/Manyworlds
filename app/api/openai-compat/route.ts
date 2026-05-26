@@ -18,7 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveCustomBaseUrl } from '../../../lib/api-base-resolver';
+import { resolveCustomBaseUrlSafely } from '../../../lib/api-base-resolver';
 
 type ChatBody = {
   systemPrompt?: string;
@@ -51,8 +51,7 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    // 借用同一个安全检查 helper(用 url 作 default,helper 会校验它)
-    baseUrl = resolveCustomBaseUrl(req, url);
+    baseUrl = await resolveCustomBaseUrlSafely(req, url);
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : String(err) },

@@ -6,17 +6,16 @@
  * 但用户的"全部进度"还包括路由配置 / 自定义 lane / 自定义剧本——
  * 漏掉它们后用户在新浏览器恢复会发现自定义剧本 / 自定义 lane 全没了。
  *
- * 覆盖范围(localStorage,sessionStorage 是临时数据不导):
+ * 覆盖范围(localStorage,sessionStorage 是临时缓存不导):
  *   ✓ wc_poc_plaza_v1            广场:队友 / 物品 / 剧本进度 / 关系 / 立绘等
  *   ✓ wc_poc_router_v2           路由 preset / overrides / fallback 链
  *   ✓ wc_poc_pref_v1             用户偏好(默认 model 等)
  *   ✓ wc_poc_byok_onboarded      BYOK 引导是否已 dismiss
- *   ✓ wc_poc_custom_lanes_v1     用户自定义的 LLM lane
- *   ✓ wc_poc_custom_image_lanes_v1 用户自定义的 Image lane(立绘生图)— 内含 apiKey 明文,
- *                                 跟其他 secret 走同一规则:默认导出整条 lane 时 key
- *                                 会跟着出去(因为它在 lane 对象内部,不是独立 key)。
- *                                 ⚠️ 想完全脱敏导出,先在 ModelsTab 删掉 Image Lane 再导出。
+ *   ✓ wc_poc_custom_lanes_v1     用户自定义的 LLM lane(默认清空对象内 apiKey)
+ *   ✓ wc_poc_custom_image_lanes_v1 用户自定义的 Image lane(默认清空对象内 apiKey)
  *   ✓ wc_poc_custom_scenarios_v1 用户自定义剧本
+ *   ✓ wc_poc_messages_v2         用户与 NPC 的聊天记录
+ *   ✓ wc_poc_events              记忆 Tab 的事件流
  *   ✓ wc_poc_apibase_*           BYOK 自定义 base URL(本身不敏感)
  *   △ wc_poc_apikey_*            BYOK API key 明文 — 默认**不导出**,需 includeKeys=true 显式启用
  *
@@ -40,10 +39,14 @@ const EXPORT_KEYS_NON_SENSITIVE = [
   'wc_poc_custom_lanes_v1',
   'wc_poc_custom_image_lanes_v1',
   'wc_poc_custom_scenarios_v1',
+  'wc_poc_messages_v2',
+  'wc_poc_events',
 ];
 
 const APIKEY_PREFIX = 'wc_poc_apikey_';
 const APIBASE_PREFIX = 'wc_poc_apibase_';
+const CUSTOM_LANES_KEY = 'wc_poc_custom_lanes_v1';
+const CUSTOM_IMAGE_LANES_KEY = 'wc_poc_custom_image_lanes_v1';
 
 export interface FullExportOptions {
   /**
@@ -63,6 +66,27 @@ export interface FullExportPayload {
   /** 导出涵盖的 storage key 列表(导入端可校验) */
   keys: string[];
   data: Record<string, unknown>;
+}
+
+function stripApiKeyFromLaneStore(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((lane) => {
+    if (!lane || typeof lane !== 'object') return lane;
+    return { ...(lane as Record<string, unknown>), apiKey: '' };
+  });
+}
+
+function parseStorageValueForExport(key: string, raw: string, includeKeys: boolean): unknown {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+  if (!includeKeys && (key === CUSTOM_LANES_KEY || key === CUSTOM_IMAGE_LANES_KEY)) {
+    return stripApiKeyFromLaneStore(parsed);
+  }
+  return parsed;
 }
 
 export function exportAllAsJson(opts: FullExportOptions = {}): string {
@@ -87,12 +111,7 @@ export function exportAllAsJson(opts: FullExportOptions = {}): string {
   for (const key of EXPORT_KEYS_NON_SENSITIVE) {
     const raw = window.localStorage.getItem(key);
     if (raw == null) continue;
-    try {
-      data[key] = JSON.parse(raw);
-    } catch {
-      // 不是 JSON(比如 byok_onboarded 存的是 '1')— 保留 raw string
-      data[key] = raw;
-    }
+    data[key] = parseStorageValueForExport(key, raw, includeKeys);
     includedKeys.push(key);
   }
 

@@ -13,8 +13,9 @@
     "dev:all": "node scripts/dev-all.mjs",
     "build:datang": "node scripts/build-datang-dlc.mjs",
     "test:prompt-snapshot": "tsx scripts/prompt-snapshot.mts",
-    "predev": "node -e \"const fs=require('fs');if(fs.existsSync('scripts/build-datang-dlc.mjs')){require('child_process').execSync('node scripts/build-datang-dlc.mjs',{stdio:'inherit'})}\"",
-    "prebuild": "node -e \"const fs=require('fs');if(fs.existsSync('scripts/build-datang-dlc.mjs')){require('child_process').execSync('node scripts/build-datang-dlc.mjs',{stdio:'inherit'})}\" && node scripts/prebuild-exclude-dev-routes.mjs"
+    "test:prompt-snapshot:private": "tsx scripts/prompt-snapshot.mts --include-private",
+    "predev": "node scripts/run-private-dlc-if-enabled.mjs",
+    "prebuild": "node scripts/run-private-dlc-if-enabled.mjs && node scripts/prebuild-exclude-dev-routes.mjs"
   },
   "dependencies": {
     "next": "^14.2.5",

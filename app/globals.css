@@ -63,6 +63,7 @@ textarea {
 }
 
 .wrap {
+  width: 100%;
   max-width: 880px;
   margin: 0 auto;
   padding: 24px;
@@ -85,6 +86,7 @@ textarea {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .tag {
@@ -136,4 +138,39 @@ textarea {
   color: #666;
   text-align: center;
   padding: 8px;
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 12px;
+  }
+
+  .card {
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  h1 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+
+  nav.row {
+    align-items: stretch;
+  }
+
+  nav.row button {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+    padding: 8px 10px;
+  }
+
+  nav.row .muted {
+    flex: 1 0 100%;
+    margin-left: 0 !important;
+  }
+
+  .msg {
+    max-width: 100%;
+  }
 }

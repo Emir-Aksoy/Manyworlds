@@ -65,6 +65,18 @@ export function isLanePublicAvailable(lane: LaneId): boolean {
 }
 
 /**
+ * 当前运行模式下 lane 是否可实际调用。
+ * - dev:全部 lane 可尝试
+ * - public:内置 lane 只允许 BYOK 白名单;custom lane 走用户自带 key/baseUrl,仍可用
+ */
+export function isLaneAvailableInCurrentMode(lane: LaneId): boolean {
+  if (!isPublicMode()) return true;
+  if (PUBLIC_AVAILABLE_LANES.includes(lane)) return true;
+  const isBuiltin = ALL_LANE_IDS.includes(lane as BuiltinLaneId);
+  return !isBuiltin;
+}
+
+/**
  * 当前运行模式下应该在 UI 里可见的 lane 列表。
  * - dev:    全部
  * - public: 只 BYOK 类(隐藏 codex_bridge / codex_spark_bridge / claude_bridge / local_gemma)

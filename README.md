@@ -1,4 +1,4 @@
-# World Crossing PoC
+# Manyworlds
 
 > Browser-only AI roleplay runtime · **BYOK (Bring Your Own Key)** · Zero-knowledge proxy · Multi-lane LLM router with fallback chains · OpenAI Images API–compatible portrait generation · Next.js 14 / React 18 / TypeScript 5
 

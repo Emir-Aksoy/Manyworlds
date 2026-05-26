@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 一键启动 World Crossing PoC 所需的 4 个服务：
+ * 一键启动 Manyworlds 所需的 4 个服务：
  *   1) Gemma UI (Gradio :7860)  — 本地 Gemma 4 + SDXL
  *   2) Codex bridge (:8766)     — ChatGPT Pro 订阅池 (gpt-5.5 / gpt-5.3-codex-spark)
  *   3) Claude bridge (:8765)    — Claude Max Agent SDK 池（2026-06-15 才生效，先占位）
@@ -208,7 +208,7 @@ const spawnedChildren = []; // 我们自己起的进程,Ctrl-C 时杀掉
 
 async function startAll() {
   console.log(`${COLOR.ok}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR.reset}`);
-  console.log(`${COLOR.ok}World Crossing PoC · 一键启动${COLOR.reset}`);
+  console.log(`${COLOR.ok}Manyworlds · 一键启动${COLOR.reset}`);
   console.log(`${COLOR.ok}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${COLOR.reset}`);
   console.log('');
 

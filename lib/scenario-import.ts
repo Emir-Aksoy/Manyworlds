@@ -33,7 +33,7 @@ export function parseScenarioJson(text: string): ValidateResult {
 
 // ─── 路径 2:LLM 生成 ─────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `你是 "World Crossing" 跨剧本叙事平台的剧本作者助手。
+const SYSTEM_PROMPT = `你是 "Manyworlds" 跨剧本叙事平台的剧本作者助手。
 
 任务:把用户提供的小说/影视剧/游戏/历史/民间故事素材,提取并改写成本平台能用的 "剧本" JSON,
 让玩家能扮演一个角色进入这个世界,与剧本中的核心 NPC 互动展开剧情。

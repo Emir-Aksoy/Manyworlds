@@ -904,9 +904,9 @@ export default function Home() {
         />
       )}
       <header style={{ marginBottom: 24 }}>
-        <h1 style={{ marginBottom: 4 }}>World Crossing — PoC</h1>
+        <h1 style={{ marginBottom: 4 }}>Manyworlds</h1>
         <p className="muted">
-          跨剧本 AI 队友 · 最小可跑骨架 · 已加载 <b>{dlcCount()}</b> 个 DLC 剧本
+          跨剧本 AI 队友 · BYOK · 已加载 <b>{dlcCount()}</b> 个 DLC 剧本
         </p>
       </header>
 
@@ -1055,7 +1055,7 @@ function SiteFooter() {
       }}
     >
       <div>
-        <b style={{ color: '#aaa' }}>World Crossing PoC</b> · 同人 fan project · 与各 IP 版权方无关 ·
+        <b style={{ color: '#aaa' }}>Manyworlds</b> · 同人 fan project · 与各 IP 版权方无关 ·
         仅供个人非商业试玩
       </div>
       <div style={{ marginTop: 2 }}>
@@ -1086,7 +1086,7 @@ function SiteFooter() {
           <h4 style={{ marginTop: 0, color: '#ddd' }}>📜 完整声明</h4>
 
           <p>
-            本站(World Crossing PoC)是一个由社区维护的、由 LLM 驱动的角色扮演同人 demo。
+            本站(Manyworlds)是一个由社区维护的、由 LLM 驱动的角色扮演同人 demo。
             所有剧本、人设、世界观借用自第三方作品,版权归原作者 / 版权方所有。本站<b>不出售、
             不展示广告、不收取任何费用</b>,亦未与任何 IP 持有方建立商业关系。如版权方认为某剧本
             构成侵权,请联系我们移除。
@@ -1313,7 +1313,7 @@ function ByokOnboardingModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ marginTop: 0, color: '#ffd86b' }}>👋 欢迎来 World Crossing</h2>
+        <h2 style={{ marginTop: 0, color: '#ffd86b' }}>👋 欢迎来 Manyworlds</h2>
         <p style={{ color: '#ddd' }}>
           跟剧本里的 NPC 自由对话,推进剧情、组队、战斗、解谜 — 全部由 LLM 实时生成。
         </p>
@@ -5233,7 +5233,7 @@ function StorageUsagePanel() {
     const a = document.createElement('a');
     a.href = url;
     const suffix = includeKeys ? '-with-keys' : '';
-    a.download = `world-crossing-backup${suffix}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `manyworlds-backup${suffix}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -7442,7 +7442,7 @@ function OnboardingModal({
   return (
     <div style={MODAL_OVERLAY_STYLE} role="dialog" aria-modal="true">
       <div style={MODAL_CARD_STYLE}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>欢迎来到 World Crossing</h2>
+        <h2 style={{ marginTop: 0, marginBottom: 8 }}>欢迎来到 Manyworlds</h2>
         <p className="muted" style={{ marginTop: 0, marginBottom: 20, fontSize: 13 }}>
           进入剧本前,跟世界报个备 — 你是谁。
           <br />
@@ -8106,7 +8106,7 @@ function DlcLoadingScreen({ result }: { result: DlcLoadResult | null }) {
         padding: 32,
       }}
     >
-      <h1 style={{ margin: 0 }}>World Crossing</h1>
+      <h1 style={{ margin: 0 }}>Manyworlds</h1>
       {!result && (
         <>
           <div className="muted" style={{ fontSize: 14 }}>

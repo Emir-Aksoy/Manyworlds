@@ -1,8 +1,8 @@
 {
-  "name": "world-crossing-poc",
+  "name": "manyworlds",
   "version": "0.0.1",
   "private": true,
-  "description": "Minimum runnable PoC for World Crossing. Halia chat + memory consolidation demo.",
+  "description": "Manyworlds — browser-only AI roleplay runtime. BYOK zero-knowledge proxy, multi-lane LLM router with fallback chains, OpenAI Images API-compatible portrait generation.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

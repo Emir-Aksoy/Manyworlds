@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'World Crossing PoC',
+  title: 'Manyworlds',
   description: '跨剧本 AI 队友——最小可跑骨架',
 };
 

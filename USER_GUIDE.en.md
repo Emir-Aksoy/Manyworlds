@@ -1,4 +1,4 @@
-# World Crossing PoC — User Guide (English)
+# Manyworlds — User Guide (English)
 
 > AI roleplay / multi-scenario fan project · BYOK (Bring Your Own LLM Key) · No accounts · No server-side database
 
@@ -6,7 +6,7 @@
 
 ## 1. What is this
 
-**World Crossing PoC** is a browser-based AI roleplay sandbox. You play a "world-crossing" protagonist who enters different scenario worlds, talks to NPCs, makes choices, recruits companions, and pushes the plot forward.
+**Manyworlds** is a browser-based AI roleplay sandbox. You play a "world-crossing" protagonist who enters different scenario worlds, talks to NPCs, makes choices, recruits companions, and pushes the plot forward.
 
 Core principles:
 
@@ -22,7 +22,7 @@ Core principles:
 
 Open the URL (local: `http://localhost:3000`, or your Vercel domain).
 
-First visit triggers the **👋 Welcome to World Crossing** onboarding modal:
+First visit triggers the **👋 Welcome to Manyworlds** onboarding modal:
 
 - Project intro
 - 🔒 Privacy guarantee

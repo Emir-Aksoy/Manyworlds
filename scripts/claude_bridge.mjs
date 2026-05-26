@@ -4,7 +4,7 @@
  * =======================
  *
  * 把本机 Claude Agent SDK 暴露为 http://127.0.0.1:8765 上的最小 HTTP 接口，
- * 让 World Crossing PoC（Next.js 跑在 :3000）通过 /api/local-claude 转发调用，
+ * 让 Manyworlds（Next.js 跑在 :3000）通过 /api/local-claude 转发调用，
  * 进而消耗你 Claude 订阅的「Agent SDK Credit 池」（Pro $20 / Max 5x $100 / Max 20x $200，
  * 每月清零，按 API 标价扣费；2026-06-15 生效）。
  *

@@ -6,7 +6,7 @@ A single-developer proof-of-concept that asks: **what does an AI roleplay sandbo
 
 This repo is the answer. It runs on Vercel Hobby (free tier), the server-side surface is a single zero-knowledge proxy lambda, and all gameplay state — including generated portraits — lives in the player's own browser.
 
-[中文使用手册](./USER_GUIDE.zh-CN.md) · [English user guide](./USER_GUIDE.en.md) · [Deploy guide](./DEPLOY.md)
+**[🎮 Try the live demo →](https://manyworlds-three.vercel.app/)** (BYOK · bring your own LLM key) · [中文使用手册](./USER_GUIDE.zh-CN.md) · [English user guide](./USER_GUIDE.en.md) · [Deploy guide](./DEPLOY.md)
 
 ---
 

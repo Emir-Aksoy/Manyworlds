@@ -36,6 +36,14 @@ export interface CharacterSpec {
    * 杨广只关心 ['sui'],婠婠 ['mojen', 'jianghu'],寇仲跨多 tag。
    */
   lore_tags?: string[];
+  /**
+   * P4 World Tick:NPC 一天作息表。
+   *   - 空 / 缺省 → NPC 永远在 NPC.locations[0] 或剧本 defaultLocation
+   *   - 非空 → 按 (day, hour) 查 schedule[i].hours;命中则 npc 当前在 entry.locationId 做 entry.action
+   *   - 建议只给 core / side 等级 NPC 写;passing NPC 留空即可(passing NPC 不参与 P4 时间模拟)
+   * 详见 ScheduleEntry。
+   */
+  schedule?: ScheduleEntry[];
 }
 
 export interface Identity {
@@ -100,6 +108,29 @@ export interface Portrait {
   context?: string;
   created_at?: string;
   user_uploaded?: boolean;
+}
+
+/**
+ * P4 World Tick:NPC 一天作息条目。
+ *
+ * 字段:
+ *   - days:适用 day 列表(in-game day 数,从 0 起);空 / 缺省 = 每天
+ *   - hours:[start, end] 24h 制,end 不含。跨日合法(如 [22, 4] 表示 22:00 到次日 04:00)
+ *   - locationId:必须在 scenario.locations[].id 白名单内
+ *   - action:给 LLM 看的当前状态描述,如 "在书房读书 / 在市集叫卖 / 入睡 / 巡逻"
+ *
+ * 多 entry 时间重叠 → 取第一个命中。
+ * 没命中任何 entry → fallback 到 NPC.locations[0] 或剧本 defaultLocation。
+ *
+ * 例:
+ *   { days: [0,1,2], hours: [9,12], locationId: 'starmail-port', action: '在邮局柜台分拣信件' }
+ *   { hours: [22, 4], locationId: 'starmail-dorm', action: '休息' }
+ */
+export interface ScheduleEntry {
+  days?: number[];
+  hours: [number, number];
+  locationId: string;
+  action: string;
 }
 
 export interface Memory {

@@ -1,0 +1,272 @@
+{
+  "_comment": "Manyworlds P4 World Tick 最小 reference scenario. 仅作 schema 演示, 不进 manifest, 不当真实剧本玩. 题材中性 (海滨小镇 + 灯塔), 无任何 IP 依赖.",
+
+  "id": "example-lighthouse",
+  "name": "海滨灯塔",
+  "shortName": "Lighthouse",
+  "description": "P4 schema 示例剧本. 5 天故事弧 / 3 地点 / 4 NPC / 5 worldEvents. 用作 reference, 不进游戏流程.",
+  "openingNarration": "黄昏的浪声把你推上沙滩. 远处灯塔的光柱在浓雾里转, 渔村的码头空了一半的船. 村长正向你走来.",
+  "defaultNpcId": "lighthouse-npc-village-chief",
+  "entryCost": 0,
+  "forceReward": { "min": 50, "max": 200 },
+
+  "loreDigest": "北境海滨小镇澜港. 三百年前国王在岬角立灯塔, 由灯塔守世代看管. 近五年海上时常出现无名雾, 雾中船只多有失踪. 第八代灯塔守上月开始言行古怪, 渔民议论纷纷. 村长在等一个外来人.",
+
+  "loreChunks": [
+    {
+      "tags": ["general"],
+      "title": "澜港世界观速读",
+      "body": "澜港地处北境海岸最西端的岬角脚下. 人口约 800, 主要靠渔业和过往商船补给为生. 村中有酒馆、市集、灯塔三大公共空间. 主要派系: 渔民公会 (fishermen) 和岬角王室派 (royalists), 两派对灯塔归属各执一词."
+    },
+    {
+      "tags": ["lighthouse"],
+      "title": "灯塔传统",
+      "body": "灯塔每代由王室直接任命的守塔人看管. 守塔人住塔顶, 终身不下塔. 现任 (第八代) 名叫埃利亚斯, 任职 30 年, 是上代守塔人之子."
+    },
+    {
+      "tags": ["fishermen"],
+      "title": "渔民公会",
+      "body": "公会会长是村长本人, 主张灯塔应归村议会管. 五年来海雾失踪事件让公会愈发不满王室. 公会大多数成员支持彻查灯塔守."
+    }
+  ],
+
+  "locations": [
+    {
+      "id": "lighthouse-tower",
+      "name": "灯塔",
+      "description": "百米高石塔, 顶层灯室长年不熄. 塔身阴湿苔藓, 唯有守塔人能入塔, 外人不得登顶. 塔下小屋是会客厅.",
+      "connections": ["fishing-village", "sea-rocks"],
+      "capacity": 3
+    },
+    {
+      "id": "fishing-village",
+      "name": "渔村中心",
+      "description": "码头、酒馆、市集三角围合的小广场. 白天有买卖, 夜里有酒. 村长的家就在广场北侧.",
+      "connections": ["lighthouse-tower"],
+      "capacity": 12
+    },
+    {
+      "id": "sea-rocks",
+      "name": "礁石海岸",
+      "description": "灯塔以西的危险礁石区, 退潮时可徒步, 涨潮时孤立. 漂流物常在此处搁浅.",
+      "connections": ["lighthouse-tower"],
+      "capacity": 2
+    }
+  ],
+
+  "initialLocation": "fishing-village",
+
+  "targetMilestones": 5,
+
+  "factions": [
+    {
+      "id": "fishermen",
+      "name": "渔民公会",
+      "summary": "村议会主导, 主张灯塔归地方."
+    },
+    {
+      "id": "royalists",
+      "name": "岬角王室派",
+      "summary": "支持王室对灯塔的传统管辖权."
+    }
+  ],
+
+  "eraTemplate": {
+    "template": "澜港纪{year}年{month}月{day}日 · {hourName}",
+    "initial": { "era": "澜港纪", "year": 318, "month": 9, "day": 0, "hour": 8 },
+    "dictionaries": {
+      "hourName": {
+        "0": "深夜",
+        "4": "拂晓",
+        "6": "清晨",
+        "8": "辰时",
+        "10": "上午",
+        "12": "正午",
+        "14": "午后",
+        "16": "黄昏",
+        "18": "黄昏",
+        "20": "入夜",
+        "22": "深夜"
+      }
+    }
+  },
+
+  "worldEvents": [
+    {
+      "id": "evt-storm-warning-day0",
+      "when": { "day_from": 0, "day_to": 0, "hour_from": 18, "hour_to": 22 },
+      "short_summary": "灯塔光柱熄灭三十秒, 全村议论",
+      "description": "夜里八点过, 灯塔的光柱无预兆熄灭整整三十秒, 然后恢复. 这是三十年来第一次熄灯. 酒馆里渔民开始议论守塔人是否生病.",
+      "visibility": "public"
+    },
+    {
+      "id": "evt-strange-fog-day1",
+      "when": { "day_from": 1, "day_to": 1, "hour_from": 6, "hour_to": 10 },
+      "short_summary": "海面冒出无名灰雾, 不像季节性",
+      "description": "拂晓时海面冒出大片灰雾, 颜色偏暗, 不像正常海雾. 雾里能听到金属碰撞声. 几个早起的渔民不敢出港.",
+      "visibility": "public",
+      "affects": { "worldFlags": { "fog-anomaly": "active" } }
+    },
+    {
+      "id": "evt-lighthouse-keeper-missing-day2",
+      "when": { "day_from": 2, "day_to": 2, "hour_from": 12, "hour_to": 16 },
+      "requires_milestones": ["ms-met-village-chief"],
+      "short_summary": "灯塔守埃利亚斯下塔后失踪",
+      "description": "渔民公会派人去问灯塔守暴风夜熄灯一事, 发现塔门虚掩, 灯室空无一人. 三十年来从未离塔的埃利亚斯, 今天不见了. 公会立刻派人封锁塔下小屋.",
+      "visibility": "faction:fishermen",
+      "affects": { "worldFlags": { "keeper-missing": "true" } }
+    },
+    {
+      "id": "evt-drifting-cargo-day3",
+      "when": { "day_from": 3, "day_to": 3, "hour_from": 22, "hour_to": 24 },
+      "short_summary": "礁石上漂来一只贴蜡封的木箱",
+      "description": "夜潮把一只半人高的木箱推上礁石. 蜡封是王室纹章. 退潮时分能徒步上礁石查看. 箱体侧面渗出暗色液体, 不是海水.",
+      "visibility": "location:sea-rocks"
+    },
+    {
+      "id": "evt-rescue-arrival-day4",
+      "when": { "day_from": 4, "day_to": 4, "hour_from": 9, "hour_to": 11 },
+      "requires_milestones": ["ms-found-cargo"],
+      "short_summary": "王室救援船抵港, 紧锁码头",
+      "description": "上午九点, 一艘王室快船入港, 卸下十二名带剑卫士. 卫士长直奔灯塔, 要村议会交出守塔人下落. 渔民公会拒绝合作.",
+      "visibility": "public",
+      "affects": { "worldFlags": { "royal-investigation": "active" } }
+    }
+  ],
+
+  "npcs": [
+    {
+      "spec_version": "v4.0",
+      "character_id": "lighthouse-npc-village-chief",
+      "identity": {
+        "name": "村长 · 玛拉",
+        "pronouns": "她",
+        "age": 52,
+        "species": "human",
+        "origin_world": "example-lighthouse",
+        "creator_user_id": "system",
+        "created_at": "2026-05-26T16:00:00Z"
+      },
+      "core_persona": {
+        "summary": "渔民公会会长, 干练务实, 对王室有积怨但不轻易表态.",
+        "traits": ["务实", "谨慎", "强硬"],
+        "values": ["集体利益", "渔民传统"],
+        "speech_style": "短句, 不绕弯, 偶尔粗话.",
+        "trust_archetype": "moderate"
+      },
+      "appearance": {
+        "description": "中年女性, 短灰发, 风霜满面, 渔妇粗布外套, 腰间挂铜钥匙串.",
+        "base_prompt": "middle-aged fisherwoman village chief, short gray hair, weathered face, coarse linen coat, brass keychain at hip, coastal village background"
+      },
+      "memory": {},
+      "meta": { "tier": "core" },
+      "locations": ["fishing-village", "lighthouse-tower"],
+      "lore_tags": ["fishermen", "lighthouse"],
+      "schedule": [
+        { "hours": [6, 9],   "locationId": "fishing-village",   "action": "在码头点检渔船出海" },
+        { "hours": [9, 12],  "locationId": "fishing-village",   "action": "在村议事厅处理公会账目" },
+        { "hours": [12, 14], "locationId": "fishing-village",   "action": "回家吃午饭" },
+        { "hours": [14, 18], "locationId": "fishing-village",   "action": "在市集巡视" },
+        { "hours": [18, 22], "locationId": "fishing-village",   "action": "在酒馆跟渔民聊天" },
+        { "hours": [22, 6],  "locationId": "fishing-village",   "action": "回家睡觉" }
+      ]
+    },
+    {
+      "spec_version": "v4.0",
+      "character_id": "lighthouse-npc-keeper-elias",
+      "identity": {
+        "name": "灯塔守 · 埃利亚斯",
+        "pronouns": "他",
+        "age": 60,
+        "species": "human",
+        "origin_world": "example-lighthouse",
+        "creator_user_id": "system",
+        "created_at": "2026-05-26T16:00:00Z"
+      },
+      "core_persona": {
+        "summary": "第八代灯塔守, 三十年未下塔, 近半年言行渐渐古怪.",
+        "traits": ["孤僻", "执拗", "博学"],
+        "values": ["守塔传统", "王室契约"],
+        "fears": ["失去塔的光"],
+        "speech_style": "古旧用词, 偶尔自言自语.",
+        "trust_archetype": "aloof"
+      },
+      "appearance": {
+        "description": "高瘦老者, 灰白长发挽起, 黑色守塔人长袍, 胸前王室徽章.",
+        "base_prompt": "tall thin elderly lighthouse keeper, gray hair tied back, black robe with royal sigil, weathered hands holding brass lantern"
+      },
+      "memory": {},
+      "meta": { "tier": "core" },
+      "locations": ["lighthouse-tower"],
+      "lore_tags": ["lighthouse", "royalists"],
+      "schedule": [
+        { "hours": [0, 6],   "locationId": "lighthouse-tower", "action": "在灯室照看光柱" },
+        { "hours": [6, 8],   "locationId": "lighthouse-tower", "action": "在塔下小屋早餐" },
+        { "hours": [8, 18],  "locationId": "lighthouse-tower", "action": "在灯室擦灯 / 校准机械" },
+        { "hours": [18, 22], "locationId": "lighthouse-tower", "action": "在塔下小屋会客 (玩家可来)" },
+        { "hours": [22, 24], "locationId": "lighthouse-tower", "action": "在灯室点亮夜灯" }
+      ]
+    },
+    {
+      "spec_version": "v4.0",
+      "character_id": "lighthouse-npc-merchant-rava",
+      "identity": {
+        "name": "商人 · 拉瓦",
+        "pronouns": "她",
+        "age": 38,
+        "species": "human",
+        "origin_world": "example-lighthouse",
+        "creator_user_id": "system",
+        "created_at": "2026-05-26T16:00:00Z"
+      },
+      "core_persona": {
+        "summary": "流浪商人, 每月来澜港补给一次, 消息灵通, 谁的便宜都赚.",
+        "traits": ["健谈", "圆滑", "唯利"],
+        "values": ["利润", "信息"],
+        "speech_style": "热情, 句尾爱加亲昵称呼, 但内核冷淡.",
+        "trust_archetype": "politician"
+      },
+      "appearance": {
+        "description": "中年女商人, 深色短发, 旅行斗篷下半身皮护甲, 腰间钱袋鼓胀.",
+        "base_prompt": "middle-aged traveling merchant woman, dark short hair, traveling cloak over leather armor, bulging coin pouch at belt"
+      },
+      "memory": {},
+      "meta": { "tier": "side" },
+      "locations": ["fishing-village"],
+      "lore_tags": ["fishermen"],
+      "schedule": [
+        { "days": [0, 1, 2, 3, 4], "hours": [8, 12],  "locationId": "fishing-village", "action": "在市集摊位卖货" },
+        { "days": [0, 1, 2, 3, 4], "hours": [12, 14], "locationId": "fishing-village", "action": "在酒馆吃午饭打听消息" },
+        { "days": [0, 1, 2, 3, 4], "hours": [14, 20], "locationId": "fishing-village", "action": "在市集摊位卖货" },
+        { "days": [0, 1, 2, 3, 4], "hours": [20, 8],  "locationId": "fishing-village", "action": "在酒馆楼上租房休息" }
+      ]
+    },
+    {
+      "spec_version": "v4.0",
+      "character_id": "lighthouse-npc-storm-stranger",
+      "identity": {
+        "name": "暴风夜的过客",
+        "pronouns": "他",
+        "age": null,
+        "species": "human",
+        "origin_world": "example-lighthouse",
+        "creator_user_id": "system",
+        "created_at": "2026-05-26T16:00:00Z"
+      },
+      "core_persona": {
+        "summary": "暴风夜被冲上礁石的陌生人, 身份不明, 只出现一次. (passing NPC, 无 schedule)",
+        "traits": ["疲惫", "沉默"],
+        "speech_style": "极少说话, 一次不超过 5 个字.",
+        "trust_archetype": "aloof"
+      },
+      "appearance": {
+        "description": "湿透的中年人, 深色衣物撕裂, 手里攥一枚刻字铜符.",
+        "base_prompt": "soaked middle-aged man washed ashore, dark torn clothing, holding an engraved bronze token tightly"
+      },
+      "memory": {},
+      "meta": { "tier": "passing" },
+      "locations": ["sea-rocks"],
+      "lore_tags": []
+    }
+  ]
+}

@@ -410,6 +410,77 @@ export function rollWishes(
   return out;
 }
 
+// ─── P4 World Tick — 时间渲染 / 时间驱动事件 ────────────────────────────
+
+/**
+ * P4 时间渲染模板。决定 plaza.worldClock 在 UI / NPC prompt 上呈现成什么文本。
+ *
+ * 渲染规则:把 `template` 字符串里的 {} 占位符按 plaza.worldClock 当前值插值。可用变量:
+ *   - {era}     — 字面 era 名(如 "永宁",或科幻里的 "M41.523")
+ *   - {year}, {month}, {day}, {hour}, {minute} — 数字插值
+ *   - {hourName} 等  — 走 dictionaries 映射(如 hour=8 → "辰时"),未命中 fallback 到 raw 数字
+ *
+ * 例(古风):
+ *   { template: '{era}{year}年{month}月{day}日 {hourName}',
+ *     initial:  { era: '永宁', year: 21, month: 3, day: 12, hour: 8 },
+ *     dictionaries: { hourName: { '8': '辰时', '12': '午时', '17': '酉时', '22': '亥时' } } }
+ *
+ * 例(现代都市):
+ *   { template: 'Day {day}, {hour}:00',
+ *     initial:  { era: '', year: 0, month: 0, day: 0, hour: 8 } }
+ *
+ * 例(科幻):
+ *   { template: 'M{era}.{day}',
+ *     initial:  { era: '41523', year: 0, month: 0, day: 0, hour: 8 } }
+ *
+ * 缺省 → 用 framework 默认 `第 {day} 天 第 {hour} 时`,所有剧本都能跑但不古风。
+ */
+export interface EraTemplate {
+  template: string;
+  initial: { era: string; year: number; month: number; day: number; hour: number };
+  dictionaries?: Record<string, Record<string, string>>;
+}
+
+/**
+ * P4 时间驱动的世界事件。跟 Beat(玩家行动驱动)并存,共同构成"剧情节点"池。
+ *
+ * 触发条件 — AND 关系全满足才 fire:
+ *   1. 当前 (day, hour) 落在 `when` 区间
+ *   2. `requires_milestones` 全部已完成(缺省 = 无前置)
+ *   3. plaza.worldEventsFired 不含此 id(每个 event 只 fire 一次)
+ *
+ * 触发后:
+ *   - 写入 plaza.worldLog(玩家可见的世界事件流)
+ *   - 接下来的 NPC 对话,该 NPC 系统 prompt 注入 "你近期听说: {description}"(按 visibility 过滤)
+ *   - 可选:narrate=true → 调 narrator lane 写一段 prose 弹给玩家
+ *   - 可选:affects.worldFlags → 写入 plaza.worldFlags,可被后续 Beat.trigger / NPC prompt 引用
+ *
+ * visibility 规则(决定哪些 NPC 会"知道"此事件):
+ *   - 'public':所有 NPC 都可能听说
+ *   - 'faction:<id>':仅属于该 faction 的 NPC
+ *   - 'location:<id>':仅当时在该 location 的 NPC
+ *
+ * P4-MVP 不做 propagation_speed_days(消息传播延迟),所有 NPC 命中 visibility 就立即知道。
+ */
+export interface WorldEvent {
+  /** kebab-case 唯一 id;剧本内唯一即可 */
+  id: string;
+  /** 触发时间窗(in-game day,从 0 起);hour 可选,命中范围越窄越严格 */
+  when: { day_from: number; day_to: number; hour_from?: number; hour_to?: number };
+  /** 必须已完成的 milestone / beat id 列表;缺省 = 无前置 */
+  requires_milestones?: string[];
+  /** 一句话总结,玩家 worldLog UI 用(15-30 字最佳) */
+  short_summary: string;
+  /** 详细描述,LLM 注入 NPC prompt 用("你听说...");建议 50-150 字 */
+  description: string;
+  /** 谁能感知到此事件 */
+  visibility: 'public' | `faction:${string}` | `location:${string}`;
+  /** 触发后写入 worldFlags 的 key/value;可被 Beat.trigger / NPC prompt 读取 */
+  affects?: { worldFlags?: Record<string, string> };
+  /** 可选:触发时调 narrator 写一段 prose 弹给玩家(P3 Narrator Lane 集成后启用) */
+  narrate?: boolean;
+}
+
 export interface Scenario {
   /** 剧本唯一 ID(对应 character.identity.origin_world) */
   id: string;
@@ -504,6 +575,21 @@ export interface Scenario {
    * 双开关设计:剧本作者声明能力,玩家在设置里激活;两者全 true 才生效。
    */
   dynamicLocations?: DynamicLocationConfig;
+  // ─── P4 World Tick ──────────────────────────────────────────────
+  /**
+   * 剧本自定义时间渲染模板(见 EraTemplate)。
+   *   - 缺省 → framework 默认 `第 {day} 天 第 {hour} 时`
+   *   - 设了 → buildIdentity / UI / world log 全部按此模板渲染 plaza.worldClock
+   * 同时 initial 字段决定玩家进入剧本时 plaza.worldClock 的起始值。
+   */
+  eraTemplate?: EraTemplate;
+  /**
+   * 时间驱动的预设事件列表(见 WorldEvent)。
+   *   - 缺省 / 空 → 不参与时间触发(剧本只走 beats 玩家驱动)
+   *   - 非空 → 每次 advanceWorld(hours) 跨整点时检查触发条件,fire 命中的 event
+   * 跟 beats[] 完全 orthogonal,可同剧本并存。
+   */
+  worldEvents?: WorldEvent[];
 }
 
 // ─── 完成度 helpers ────────────────────────────────────────────────

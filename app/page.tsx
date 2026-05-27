@@ -88,6 +88,7 @@ import {
 import { detectNpcEmotion, getEmotionAutoTrust } from '../lib/emotion-detect';
 import { analyzeReplyStructure, recordReplyMetrics } from '../lib/reply-metrics';
 import { generateSceneImage, readSceneImage, writeSceneImage } from '../lib/scene-images';
+import { getInitialClock } from '../lib/world-tick';
 import { resolveEmotionPolicy } from '../lib/plaza';
 import { exportAllAsJson } from '../lib/full-export';
 import {
@@ -958,11 +959,14 @@ export default function Home() {
               return;
             }
             // 1) 原力扣 + ScenarioProgress 建立 + 携带快照写入
+            //    P4:把 scenario.eraTemplate.initial 算成 WorldClock 传入(无 eraTemplate → 默认 {day:0,hour:8})。
+            //    既有 progress(re-entry)会忽略此参数,保留上次离开时的 clock。
             const r = plaza.enterScenario(
               sc.id,
               sc.entryCost,
               pendingEntry.startSceneId,
               entry.loadout,
+              getInitialClock(sc),
             );
             if (!r.ok) {
               alert(r.reason);

@@ -23,7 +23,14 @@
 import type { CombatStat } from './combat-stats';
 import { makePlayerCombatStat, makeFullCombatStat, applyDeltaToStat } from './combat-stats';
 // type-only import:DynamicLocation 类型 schema 跨模块共享。运行时这行被编译掉,无循环依赖。
-import type { DynamicLocation, LocationArtifact } from './scenarios';
+import type { DynamicLocation, LocationArtifact, Scenario, WorldEvent } from './scenarios';
+// P4 World Tick:WorldClock / WorldLogEntry 类型 + advance/evaluator 纯函数。
+import type { WorldClock, WorldLogEntry } from './world-tick';
+import {
+  advanceClockWithEvents,
+  findFiringWorldEvents,
+  getInitialClock,
+} from './world-tick';
 
 // ─── Magic 系统标签 (6 个闭集) ─────────────────────────────────────
 
@@ -285,6 +292,26 @@ export interface ScenarioProgress {
   settled?: boolean;
   /** 首次结算时间(展示用)。 */
   firstSettledAt?: string;
+
+  // ─── P4 World Tick(可选,旧存档 / 不启用 eraTemplate 的剧本缺省) ──
+
+  /**
+   * 当前世界时钟。enterScenario 时若 progress 不存在 → 由 scenario.eraTemplate.initial 初始化;
+   * 已 existing progress → 保留旧 clock(支持"上次离开时几点几日,回来还是几点几日")。
+   * 不启用 P4 的剧本可以永远不写此字段;HUD/prompt 注入侧用 undefined 判退化。
+   */
+  worldClock?: WorldClock;
+  /**
+   * 已 fire 过的 WorldEvent.id 集合。每个 event 一辈子只 fire 一次,
+   * 即使 clock 反复落进窗口也不会重新返回。
+   * resetScenario 清掉整个 progress → 自然连这字段也清掉。
+   */
+  worldEventsFired?: string[];
+  /**
+   * 玩家可见的"世界事件流"日志。advanceClock 推进时新触发的 event 写入这里;
+   * UI 可以渲染成"日报"。short_summary 缓存在 entry 里,避免作者改 scenario 文件后失同步。
+   */
+  worldLog?: WorldLogEntry[];
 }
 
 // ─── 立绘偏好 ─────────────────────────────────────────────────────
@@ -1294,6 +1321,13 @@ export const plaza = {
     cost: number,
     startSceneId?: string,
     loadout?: { companionIds: string[]; itemIds: string[] },
+    /**
+     * P4 World Tick:初始世界时钟。由 caller 通过 getInitialClock(scenario) 算好传入。
+     *   - 新 progress 写入此值
+     *   - 既有 progress(re-entry)→ 保留旧 clock,忽略此参数(支持"离开时 day 3 hour 14,回来还在 day 3 hour 14")
+     *   - 不启用 P4 的剧本不传即可(undefined),progress.worldClock 留空
+     */
+    initialClock?: WorldClock,
   ): EnterScenarioResult {
     const s = readPlaza();
     if (s.inScenario) {
@@ -1344,6 +1378,11 @@ export const plaza = {
           // 不重置 completedBeatIds,允许复访剧本时累积进度
           currentSceneId: existing.currentSceneId ?? startSceneId ?? null,
           lastVisitedAt: now,
+          // P4:既有 progress 保留旧 worldClock/eventsFired/log;若历史 progress 没这些字段(老存档)
+          // 且 caller 传了 initialClock,补一份新的(等同首次启用 P4)。
+          worldClock: existing.worldClock ?? initialClock,
+          worldEventsFired: existing.worldEventsFired ?? (initialClock ? [] : undefined),
+          worldLog: existing.worldLog ?? (initialClock ? [] : undefined),
         }
       : {
           scenarioId,
@@ -1352,6 +1391,10 @@ export const plaza = {
           visitedSceneIds: startSceneId ? [startSceneId] : [],
           startedAt: now,
           lastVisitedAt: now,
+          // P4 World Tick:新 progress 写入 initialClock(若 caller 传了);否则三字段全 undefined
+          worldClock: initialClock,
+          worldEventsFired: initialClock ? [] : undefined,
+          worldLog: initialClock ? [] : undefined,
         };
     // 关键修复:按 loadout 同步 companion.active —— EntryModal 未勾选的 companion 必须 active=false。
     // 否则 active 残留上次状态(默认 true),banter 路径直接读 c.active 会让未勾选的 companion 仍然插嘴。
@@ -1459,6 +1502,124 @@ export const plaza = {
     } else {
       writePlaza({ ...s, currentLocation: loc });
     }
+  },
+
+  // ── P4 World Tick API ───────────────────────────────────
+
+  /**
+   * 推进当前剧本的世界时钟,触发落入新窗口的 WorldEvents。
+   *
+   * 调用方:UI 上的"等候 X 小时 / 睡到天亮"按钮,或 LLM 输出某种"时间流逝"标记后由 page.tsx 调用。
+   *
+   * 行为:
+   *   1. 验证 inScenario === scenario.id(防止"广场态推时间"或剧本张冠李戴)
+   *   2. 读 progress.worldClock;若为 undefined → 拒绝(此剧本未启用 P4 / 旧存档)
+   *   3. 按 deltaHours 逐 tick 推进,每 tick 查 findFiringWorldEvents
+   *   4. 新 fire 的 events 追加到 worldEventsFired + worldLog(各 entry 携带 ts 快照 + summary 缓存)
+   *
+   * 返回:
+   *   - ok: true → 新 clock + 本次 fire 的 events 列表(可能为空)
+   *   - ok: false → 拒绝原因(UI 用 toast 展示)
+   *
+   * 注:仅推进,不触发 narrator lane / NPC 注入 — 那是 caller(page.tsx)的责任,
+   * 它拿到 firedEvents 后决定如何展示(参见 WorldEvent.narrate 字段)。
+   */
+  advanceClock(
+    scenario: Scenario,
+    deltaHours: number,
+  ):
+    | { ok: true; clock: WorldClock; firedEvents: WorldEvent[] }
+    | { ok: false; reason: string } {
+    const s = readPlaza();
+    if (s.inScenario !== scenario.id) {
+      return {
+        ok: false,
+        reason: `当前不在剧本 ${scenario.id}(in=${s.inScenario ?? 'plaza'})`,
+      };
+    }
+    const progress = s.scenarioProgress[scenario.id];
+    if (!progress) return { ok: false, reason: 'progress 缺失,enterScenario 未跑过' };
+    const oldClock = progress.worldClock;
+    if (!oldClock) return { ok: false, reason: '此剧本未启用 P4 World Tick(无 worldClock)' };
+    const delta = Math.floor(deltaHours);
+    if (!Number.isFinite(delta) || delta <= 0) {
+      return { ok: false, reason: 'deltaHours 必须为正整数' };
+    }
+    const alreadyFired = progress.worldEventsFired ?? [];
+    const milestones = progress.completedBeatIds ?? [];
+    const { clock: newClock, events: firedEvents } = advanceClockWithEvents(
+      scenario,
+      oldClock,
+      delta,
+      milestones,
+      alreadyFired,
+    );
+    // 把 fire 的 events 写入 log;ts 用每个 event 的 fire 时刻不易追溯(advanceClockWithEvents 不返回 per-event ts),
+    // 这里统一用 newClock(终态)作快照。需要 per-event ts 的话 P4-B 把 advanceClockWithEvents 改造成返回 [{ts, event}][]。
+    const newLogEntries: WorldLogEntry[] = firedEvents.map((ev) => ({
+      ts: { ...newClock },
+      eventId: ev.id,
+      summary: ev.short_summary,
+    }));
+    const updatedProgress: ScenarioProgress = {
+      ...progress,
+      worldClock: newClock,
+      worldEventsFired: [...alreadyFired, ...firedEvents.map((e) => e.id)],
+      worldLog: [...(progress.worldLog ?? []), ...newLogEntries],
+    };
+    writePlaza({
+      ...s,
+      scenarioProgress: { ...s.scenarioProgress, [scenario.id]: updatedProgress },
+    });
+    return { ok: true, clock: newClock, firedEvents };
+  },
+
+  /**
+   * 在不推进 clock 的前提下,查询此刻应该 fire 的 WorldEvents(用于刚 enterScenario / milestone 达成后补 fire)。
+   *
+   * 比如:enterScenario 后,initialClock 落在某 event 的 when 窗口里 — advanceClock 还没触发那 tick,
+   * caller 调一次 fireDueWorldEvents(scenario) 把"开局就该有的"事件抓出来。
+   *
+   * 同样的:玩家完成一个 milestone(写入 completedBeatIds)后,某 event 的 requires_milestones 终于满足,
+   * 而 clock 已经在窗口内 — 调 fireDueWorldEvents 就能立即让它 fire 而无需等下一次 advanceClock。
+   *
+   * 不动 clock,只动 worldEventsFired + worldLog。
+   */
+  fireDueWorldEvents(
+    scenario: Scenario,
+  ):
+    | { ok: true; firedEvents: WorldEvent[] }
+    | { ok: false; reason: string } {
+    const s = readPlaza();
+    if (s.inScenario !== scenario.id) {
+      return {
+        ok: false,
+        reason: `当前不在剧本 ${scenario.id}(in=${s.inScenario ?? 'plaza'})`,
+      };
+    }
+    const progress = s.scenarioProgress[scenario.id];
+    if (!progress) return { ok: false, reason: 'progress 缺失' };
+    const clock = progress.worldClock;
+    if (!clock) return { ok: true, firedEvents: [] }; // 未启用 P4 → 无 event 可 fire
+    const alreadyFired = progress.worldEventsFired ?? [];
+    const milestones = progress.completedBeatIds ?? [];
+    const firedEvents = findFiringWorldEvents(scenario, clock, milestones, alreadyFired);
+    if (firedEvents.length === 0) return { ok: true, firedEvents: [] };
+    const newLogEntries: WorldLogEntry[] = firedEvents.map((ev) => ({
+      ts: { ...clock },
+      eventId: ev.id,
+      summary: ev.short_summary,
+    }));
+    const updatedProgress: ScenarioProgress = {
+      ...progress,
+      worldEventsFired: [...alreadyFired, ...firedEvents.map((e) => e.id)],
+      worldLog: [...(progress.worldLog ?? []), ...newLogEntries],
+    };
+    writePlaza({
+      ...s,
+      scenarioProgress: { ...s.scenarioProgress, [scenario.id]: updatedProgress },
+    });
+    return { ok: true, firedEvents };
   },
 
   // ── 世界控制三件套 API ───────────────────────────────────
